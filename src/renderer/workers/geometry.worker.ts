@@ -2,7 +2,6 @@
 import Module, { type ManifoldToplevel } from 'manifold-3d';
 
 export type BooleanOp = 'union' | 'difference' | 'intersection';
-export type Vec3 = [number, number, number];
 
 export interface SerializedMesh {
   positions: Float32Array;
@@ -12,10 +11,8 @@ export interface SerializedMesh {
 interface RunRequest {
   id: number;
   op: BooleanOp;
-  sizeA: Vec3;
-  centerA: Vec3;
-  sizeB: Vec3;
-  centerB: Vec3;
+  a: SerializedMesh;
+  b: SerializedMesh;
 }
 
 interface RunResponse {
@@ -38,25 +35,32 @@ async function getWasm(): Promise<ManifoldToplevel> {
 }
 
 self.onmessage = async (event: MessageEvent<RunRequest>) => {
-  const { id, op, sizeA, centerA, sizeB, centerB } = event.data;
+  const { id, op, a, b } = event.data;
 
   try {
     const wasm = await getWasm();
-    const { Manifold } = wasm;
+    const { Manifold, Mesh } = wasm;
 
-    // Manifold.cube() is used (rather than a hand-built mesh) so the input
-    // geometry is guaranteed watertight and correctly wound by construction.
-    const a = Manifold.cube(sizeA, false).translate(centerA);
-    const b = Manifold.cube(sizeB, false).translate(centerB);
+    // Our source meshes are flat-shaded (each face owns its own corner vertices, even
+    // where they coincide with a neighbor's) — merge() welds those coincident positions
+    // so the result is a proper watertight 2-manifold Manifold can operate on.
+    const meshA = new Mesh({ numProp: 3, vertProperties: a.positions, triVerts: a.indices });
+    meshA.merge();
+    const meshB = new Mesh({ numProp: 3, vertProperties: b.positions, triVerts: b.indices });
+    meshB.merge();
 
-    const result = op === 'union' ? a.add(b) : op === 'difference' ? a.subtract(b) : a.intersect(b);
+    const manifoldA = new Manifold(meshA);
+    const manifoldB = new Manifold(meshB);
+
+    const result =
+      op === 'union' ? manifoldA.add(manifoldB) : op === 'difference' ? manifoldA.subtract(manifoldB) : manifoldA.intersect(manifoldB);
 
     const outMesh = result.getMesh();
     const positions = new Float32Array(outMesh.vertProperties);
     const indices = new Uint32Array(outMesh.triVerts);
 
-    a.delete();
-    b.delete();
+    manifoldA.delete();
+    manifoldB.delete();
     result.delete();
 
     const response: RunResponse = { id, ok: true, result: { positions, indices } };

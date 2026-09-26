@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { PALETTE } from './palette';
 
 export type MovementMode = 'build' | 'spectator';
+export type ToolMode = 'select' | 'move' | 'rotate' | 'scale' | 'extrude' | 'paint';
 
 export const HOTBAR_SIZE = 9;
 
@@ -11,7 +13,8 @@ export interface AppState {
   pointerLocked: boolean;
   hotbarIndex: number;
   spectatorSpeed: number;
-  selection: string[];
+  toolMode: ToolMode;
+  activeColor: string;
 
   setPointerLocked: (locked: boolean) => void;
   setHotbarIndex: (index: number) => void;
@@ -19,9 +22,8 @@ export interface AppState {
   toggleSpectator: () => void;
   togglePhysics: () => void;
   adjustSpectatorSpeed: (deltaScroll: number) => void;
-  setSelection: (ids: string[]) => void;
-  toggleSelected: (id: string, additive: boolean) => void;
-  clearSelection: () => void;
+  setToolMode: (mode: ToolMode) => void;
+  setActiveColor: (color: string) => void;
 }
 
 const MIN_SPECTATOR_SPEED = 2;
@@ -34,13 +36,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   pointerLocked: false,
   hotbarIndex: 0,
   spectatorSpeed: 12,
-  selection: [],
+  toolMode: 'select',
+  activeColor: PALETTE[0]!.color,
 
   setPointerLocked: (locked) => set({ pointerLocked: locked }),
 
   setHotbarIndex: (index) => {
     if (index < 0 || index >= HOTBAR_SIZE) return;
-    set({ hotbarIndex: index });
+    const color = PALETTE[index]?.color;
+    set({ hotbarIndex: index, ...(color ? { activeColor: color } : {}) });
   },
 
   toggleInspector: () =>
@@ -62,18 +66,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ spectatorSpeed: next });
   },
 
-  setSelection: (ids) => set({ selection: ids }),
-
-  toggleSelected: (id, additive) =>
-    set((state) => {
-      const has = state.selection.includes(id);
-      if (!additive) {
-        return { selection: has && state.selection.length === 1 ? [] : [id] };
-      }
-      return {
-        selection: has ? state.selection.filter((s) => s !== id) : [...state.selection, id]
-      };
-    }),
-
-  clearSelection: () => set({ selection: [] })
+  setToolMode: (mode) => set({ toolMode: mode }),
+  setActiveColor: (color) => set({ activeColor: color })
 }));

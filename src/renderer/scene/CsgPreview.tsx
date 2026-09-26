@@ -1,8 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useCsgStore } from '../state/csgStore';
 
-/** Renders the last Manifold3D boolean-op result, floating above the world as a visible pipeline proof. */
+/**
+ * Renders the last Manifold3D boolean-op result. The worker receives world-space
+ * triangle soups (see objectToWorldTriangleSoup), so the result comes back already in
+ * world space — this mesh renders at the identity transform, no extra offset needed.
+ */
 export default function CsgPreview() {
   const preview = useCsgStore((s) => s.preview);
 
@@ -15,11 +19,15 @@ export default function CsgPreview() {
     return geo;
   }, [preview]);
 
+  useEffect(() => {
+    return () => geometry?.dispose();
+  }, [geometry]);
+
   if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry} position={[0, 5, 0]} castShadow receiveShadow>
-      <meshStandardMaterial color="#5eead4" roughness={0.3} metalness={0.15} />
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color="#5eead4" roughness={0.3} metalness={0.15} side={THREE.DoubleSide} />
     </mesh>
   );
 }

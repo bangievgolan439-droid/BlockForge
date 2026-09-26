@@ -24,7 +24,7 @@ export default class PhysicsErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: unknown) {
     console.error('Physics Sandbox crashed, falling back to Build mode:', error);
-    // Flips the store, which unmounts this boundary (SceneRoot swaps back to <VoxelWorld/>
+    // Flips the store, which unmounts this boundary (SceneRoot swaps back to <SceneObjects/>
     // once physicsActive is false), so there's no need to reset local state here.
     useAppStore.setState({ physicsActive: false });
   }

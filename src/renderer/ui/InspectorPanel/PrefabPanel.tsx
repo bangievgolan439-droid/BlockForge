@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '../../state/appStore';
-import { useWorldStore } from '../../state/worldStore';
+import { useSceneStore, type SerializedPrefab } from '../../state/sceneStore';
 
 export default function PrefabPanel() {
-  const selection = useAppStore((s) => s.selection);
-  const serializeKeys = useWorldStore((s) => s.serializeKeys);
-  const placePrefab = useWorldStore((s) => s.placePrefab);
+  const selection = useSceneStore((s) => s.selection);
+  const serializeSelection = useSceneStore((s) => s.serializeSelection);
+  const loadObjects = useSceneStore((s) => s.loadObjects);
 
   const [name, setName] = useState('');
   const [prefabs, setPrefabs] = useState<string[]>([]);
@@ -28,9 +27,9 @@ export default function PrefabPanel() {
       setStatus('Give the prefab a name first.');
       return;
     }
-    const serialized = serializeKeys(selection);
+    const serialized = serializeSelection(selection);
     if (!serialized) {
-      setStatus('Select some blocks first.');
+      setStatus('Select at least one object first.');
       return;
     }
     try {
@@ -46,11 +45,9 @@ export default function PrefabPanel() {
   const load = async (prefabName: string) => {
     if (!bridgeAvailable) return;
     try {
-      const data = (await window.blockforge.prefabs.load(prefabName)) as {
-        blocks: Record<string, number>;
-      };
-      placePrefab(data.blocks, [0, 3, 0]);
-      setStatus(`Loaded "${prefabName}" above the world origin.`);
+      const data = (await window.blockforge.prefabs.load(prefabName)) as SerializedPrefab;
+      loadObjects(data.objects, [0, 2, 0]);
+      setStatus(`Loaded "${prefabName}".`);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err));
     }
@@ -75,7 +72,7 @@ export default function PrefabPanel() {
         </button>
       </div>
 
-      <p className="mb-2 text-[11px] text-white/40">Saves the current selection ({selection.length} blocks).</p>
+      <p className="mb-2 text-[11px] text-white/40">Saves the current selection ({selection.length} objects).</p>
 
       <ul className="mb-3 space-y-1">
         {prefabs.map((p) => (

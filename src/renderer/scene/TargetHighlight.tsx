@@ -1,27 +1,46 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { targetedCellRef } from './buildTarget';
+import { targetedObjectRef } from './buildTarget';
+import { objectMeshRegistry } from './objectRegistry';
+
+const edgesGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+
+const worldPos = new THREE.Vector3();
+const worldQuat = new THREE.Quaternion();
+const worldScale = new THREE.Vector3();
+const size = new THREE.Vector3();
+const center = new THREE.Vector3();
 
 export default function TargetHighlight() {
   const ref = useRef<THREE.LineSegments>(null);
 
   useFrame(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const cell = targetedCellRef.current;
-    if (!cell) {
-      mesh.visible = false;
+    const highlight = ref.current;
+    if (!highlight) return;
+
+    const target = targetedObjectRef.current;
+    const mesh = target ? objectMeshRegistry.get(target.objectId) : undefined;
+    const bbox = mesh?.geometry.boundingBox;
+    if (!mesh || !bbox) {
+      highlight.visible = false;
       return;
     }
-    mesh.visible = true;
-    mesh.position.set(cell[0], cell[1], cell[2]);
+
+    highlight.visible = true;
+    mesh.matrixWorld.decompose(worldPos, worldQuat, worldScale);
+    bbox.getSize(size);
+    bbox.getCenter(center);
+
+    const centerWorldOffset = center.clone().multiply(worldScale).applyQuaternion(worldQuat);
+    highlight.position.copy(worldPos).add(centerWorldOffset);
+    highlight.quaternion.copy(worldQuat);
+    highlight.scale.set(size.x * worldScale.x * 1.02, size.y * worldScale.y * 1.02, size.z * worldScale.z * 1.02);
   });
 
   return (
-    <lineSegments ref={ref} renderOrder={999}>
-      <edgesGeometry args={[new THREE.BoxGeometry(1.002, 1.002, 1.002)]} />
-      <lineBasicMaterial color="#0a0b0f" transparent opacity={0.85} depthTest={false} />
+    <lineSegments ref={ref} geometry={edgesGeometry} renderOrder={999} frustumCulled={false}>
+      <lineBasicMaterial color="#5eead4" transparent opacity={0.9} depthTest={false} />
     </lineSegments>
   );
 }

@@ -1,5 +1,5 @@
 import { useAppStore } from '../state/appStore';
-import { BLOCK_TYPES } from '../state/worldStore';
+import { PALETTE } from '../state/palette';
 
 export default function Hotbar() {
   const hotbarIndex = useAppStore((s) => s.hotbarIndex);
@@ -8,7 +8,7 @@ export default function Hotbar() {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 flex justify-center">
       <div className="glass-panel pointer-events-auto flex gap-1.5 rounded-xl p-1.5">
-        {BLOCK_TYPES.map((block, i) => {
+        {PALETTE.map((block, i) => {
           const active = i === hotbarIndex;
           return (
             <button

@@ -1,5 +1,4 @@
 export type BooleanOp = 'union' | 'difference' | 'intersection';
-export type Vec3 = [number, number, number];
 
 export interface SerializedMesh {
   positions: Float32Array;
@@ -37,12 +36,15 @@ function ensureWorker(): Worker {
   return worker;
 }
 
-/** Runs a watertight box boolean off the main thread via Manifold3D (WASM). */
-export function runBoxBoolean(op: BooleanOp, sizeA: Vec3, centerA: Vec3, sizeB: Vec3, centerB: Vec3): Promise<SerializedMesh> {
+/**
+ * Runs a watertight boolean between two world-space triangle soups, off the main thread
+ * via Manifold3D (WASM). Transfers `a`/`b` buffers — pass fresh copies, not shared data.
+ */
+export function runMeshBoolean(op: BooleanOp, a: SerializedMesh, b: SerializedMesh): Promise<SerializedMesh> {
   const w = ensureWorker();
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    w.postMessage({ id, op, sizeA, centerA, sizeB, centerB });
+    w.postMessage({ id, op, a, b }, [a.positions.buffer, a.indices.buffer, b.positions.buffer, b.indices.buffer]);
   });
 }

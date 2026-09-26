@@ -1,25 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../state/appStore';
-import { useWorldStore } from '../state/worldStore';
 import { isKeyPressed } from './keyboard';
 
-const GRAVITY = -28;
-const JUMP_SPEED = 9;
-const WALK_SPEED = 6;
+const BUILD_SPEED = 6;
+const BUILD_VERTICAL_SPEED = 4;
 const SPRINT_MULTIPLIER = 1.6;
-const PLAYER_EYE_HEIGHT = 1.6;
-const STEP_TOLERANCE = 1.05;
 const UP = new THREE.Vector3(0, 1, 0);
 
+/**
+ * There is no ground in this world — it's a void the player builds into. Build mode
+ * therefore has no gravity/floor collision, just level flight (WASD is horizontal-only,
+ * relative to look yaw; Space/Shift move straight up/down). Spectator mode additionally
+ * follows the camera's full look direction (including pitch), for fast free-roam.
+ */
 export default function MovementController() {
   const { camera } = useThree();
-  const velocityY = useRef(0);
-  const grounded = useRef(false);
 
   useEffect(() => {
-    camera.position.set(0, 1 + PLAYER_EYE_HEIGHT, 6);
+    camera.position.set(0, 1.6, 6);
   }, [camera]);
 
   useEffect(() => {
@@ -54,7 +54,6 @@ export default function MovementController() {
       return;
     }
 
-    // Build mode: horizontal-only walk direction, gravity + simple step-blocking collision.
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     forward.y = 0;
@@ -69,39 +68,11 @@ export default function MovementController() {
     if (move.lengthSq() > 0) move.normalize();
 
     const sprinting = isKeyPressed('ShiftLeft') || isKeyPressed('ShiftRight');
-    const speed = WALK_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1);
+    const speed = BUILD_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1);
+    camera.position.addScaledVector(move, speed * dt);
 
-    const feetY = camera.position.y - PLAYER_EYE_HEIGHT;
-    const heightAt = useWorldStore.getState().heightAt;
-
-    const canStandAt = (x: number, z: number) => {
-      const top = heightAt(Math.round(x), Math.round(z));
-      return top === -Infinity || top <= feetY + STEP_TOLERANCE;
-    };
-
-    const nextX = camera.position.x + move.x * speed * dt;
-    const nextZ = camera.position.z + move.z * speed * dt;
-    if (canStandAt(nextX, camera.position.z)) camera.position.x = nextX;
-    if (canStandAt(camera.position.x, nextZ)) camera.position.z = nextZ;
-
-    if (isKeyPressed('Space') && grounded.current) {
-      velocityY.current = JUMP_SPEED;
-      grounded.current = false;
-    }
-
-    velocityY.current += GRAVITY * dt;
-    const groundTop = heightAt(Math.round(camera.position.x), Math.round(camera.position.z));
-    const groundEyeY = (groundTop === -Infinity ? -40 : groundTop + 1) + PLAYER_EYE_HEIGHT;
-
-    let nextY = camera.position.y + velocityY.current * dt;
-    if (nextY <= groundEyeY) {
-      nextY = groundEyeY;
-      velocityY.current = 0;
-      grounded.current = true;
-    } else {
-      grounded.current = false;
-    }
-    camera.position.y = nextY;
+    if (isKeyPressed('Space')) camera.position.y += BUILD_VERTICAL_SPEED * dt;
+    if (isKeyPressed('ControlLeft') || isKeyPressed('ControlRight')) camera.position.y -= BUILD_VERTICAL_SPEED * dt;
   });
 
   return null;

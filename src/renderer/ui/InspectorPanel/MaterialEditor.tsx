@@ -1,56 +1,53 @@
-import { useState } from 'react';
-import { BLOCK_TYPES } from '../../state/worldStore';
-import { useMaterialStore } from '../../state/materialStore';
+import { useAppStore } from '../../state/appStore';
+import { PALETTE } from '../../state/palette';
 
 export default function MaterialEditor() {
-  const [typeId, setTypeId] = useState(BLOCK_TYPES[0]!.id);
-  const color = useMaterialStore((s) => s.resolvedColor(typeId));
-  const scale = useMaterialStore((s) => s.resolvedScale(typeId));
-  const setColorOverride = useMaterialStore((s) => s.setColorOverride);
-  const setTriplanarScale = useMaterialStore((s) => s.setTriplanarScale);
+  const activeColor = useAppStore((s) => s.activeColor);
+  const setActiveColor = useAppStore((s) => s.setActiveColor);
+  const toolMode = useAppStore((s) => s.toolMode);
+  const setToolMode = useAppStore((s) => s.setToolMode);
 
   return (
     <section>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Material Editor</h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Material</h3>
 
-      <select
-        value={typeId}
-        onChange={(e) => setTypeId(Number(e.target.value))}
-        className="mb-3 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white/85"
-      >
-        {BLOCK_TYPES.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
+      <div className="mb-3 grid grid-cols-9 gap-1">
+        {PALETTE.map((p) => (
+          <button
+            key={p.id}
+            title={p.name}
+            onClick={() => setActiveColor(p.color)}
+            className={`aspect-square rounded-sm border transition-transform ${
+              activeColor === p.color ? 'scale-110 border-forge-accent' : 'border-black/30 hover:scale-105'
+            }`}
+            style={{ backgroundColor: p.color }}
+          />
         ))}
-      </select>
+      </div>
 
       <label className="mb-3 flex items-center justify-between text-xs text-white/60">
-        Base color
+        Custom color
         <input
           type="color"
-          value={color}
-          onChange={(e) => setColorOverride(typeId, e.target.value)}
+          value={activeColor}
+          onChange={(e) => setActiveColor(e.target.value)}
           className="h-7 w-12 cursor-pointer rounded border border-white/10 bg-transparent"
         />
       </label>
 
-      <label className="block text-xs text-white/60">
-        Triplanar tiling: {scale.toFixed(2)}
-        <input
-          type="range"
-          min={0.1}
-          max={2}
-          step={0.05}
-          value={scale}
-          onChange={(e) => setTriplanarScale(typeId, Number(e.target.value))}
-          className="mt-1 w-full accent-forge-accent"
-        />
-      </label>
+      {toolMode !== 'paint' ? (
+        <button
+          onClick={() => setToolMode('paint')}
+          className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
+        >
+          Activate Paint tool (P)
+        </button>
+      ) : (
+        <p className="text-[11px] text-forge-accent">Paint active — click any face to apply this color.</p>
+      )}
 
       <p className="mt-3 text-[11px] text-white/40">
-        Updates every placed block of this type instantly — the world-space triplanar shader means a stretched
-        or sheared face never smears the texture.
+        This color is also what the next spawned object (right-click in Build mode) uses.
       </p>
     </section>
   );

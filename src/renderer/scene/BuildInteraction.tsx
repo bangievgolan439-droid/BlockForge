@@ -2,37 +2,32 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useAppStore } from '../state/appStore';
-import { useWorldStore, unkey } from '../state/worldStore';
-import { raycastVoxels } from './voxelRegistry';
-import { targetedCellRef } from './buildTarget';
+import { useSceneStore } from '../state/sceneStore';
+import { raycastObjects, type ObjectRaycastHit } from './objectRegistry';
+import { targetedObjectRef } from './buildTarget';
 
-const MAX_REACH = 8;
+const MAX_REACH = 30;
+const SPAWN_DISTANCE = 4;
 const raycaster = new THREE.Raycaster();
 raycaster.far = MAX_REACH;
 const centerNdc = new THREE.Vector2(0, 0);
 
 export default function BuildInteraction() {
   const { camera, gl } = useThree();
-  const hoveredRef = useRef<{ key: string; normal: THREE.Vector3 } | null>(null);
+  const hoveredRef = useRef<ObjectRaycastHit | null>(null);
 
   useFrame(() => {
     const { movementMode, inspectorOpen, pointerLocked } = useAppStore.getState();
     if (movementMode !== 'build' || inspectorOpen || !pointerLocked) {
       hoveredRef.current = null;
-      targetedCellRef.current = null;
+      targetedObjectRef.current = null;
       return;
     }
 
     raycaster.setFromCamera(centerNdc, camera);
-    const hit = raycastVoxels(raycaster);
-    if (!hit) {
-      hoveredRef.current = null;
-      targetedCellRef.current = null;
-      return;
-    }
-
-    hoveredRef.current = { key: hit.key, normal: hit.normal };
-    targetedCellRef.current = unkey(hit.key);
+    const hit = raycastObjects(raycaster);
+    hoveredRef.current = hit;
+    targetedObjectRef.current = hit ? { objectId: hit.objectId } : null;
   });
 
   useEffect(() => {
@@ -40,22 +35,26 @@ export default function BuildInteraction() {
 
     const onMouseDown = (event: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return;
-      const { movementMode, inspectorOpen, hotbarIndex } = useAppStore.getState();
+      const { movementMode, inspectorOpen, activeColor } = useAppStore.getState();
       if (movementMode !== 'build' || inspectorOpen) return;
 
       const hovered = hoveredRef.current;
-      if (!hovered) return;
-
-      const [x, y, z] = unkey(hovered.key);
 
       if (event.button === 0) {
-        useWorldStore.getState().removeBlock(x, y, z);
-      } else if (event.button === 2) {
-        const nx = x + Math.round(hovered.normal.x);
-        const ny = y + Math.round(hovered.normal.y);
-        const nz = z + Math.round(hovered.normal.z);
-        const typeId = hotbarIndex + 1;
-        useWorldStore.getState().placeBlock(nx, ny, nz, typeId);
+        if (hovered) useSceneStore.getState().deleteObject(hovered.objectId);
+        return;
+      }
+
+      if (event.button === 2) {
+        if (hovered) {
+          const spawnPoint = hovered.point.clone().addScaledVector(hovered.normal, 0.5);
+          useSceneStore.getState().spawnBox([spawnPoint.x, spawnPoint.y, spawnPoint.z], activeColor);
+        } else {
+          const forward = new THREE.Vector3();
+          camera.getWorldDirection(forward);
+          const spawnPoint = camera.position.clone().addScaledVector(forward, SPAWN_DISTANCE);
+          useSceneStore.getState().spawnBox([spawnPoint.x, spawnPoint.y, spawnPoint.z], activeColor);
+        }
       }
     };
 
@@ -67,7 +66,7 @@ export default function BuildInteraction() {
       canvas.removeEventListener('mousedown', onMouseDown);
       canvas.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [gl]);
+  }, [gl, camera]);
 
   return null;
 }

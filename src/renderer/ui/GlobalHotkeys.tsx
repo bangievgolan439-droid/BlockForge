@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useAppStore } from '../state/appStore';
-import { useWorldStore } from '../state/worldStore';
+import { useAppStore, type ToolMode } from '../state/appStore';
+import { useSceneStore } from '../state/sceneStore';
 
 const DIGIT_CODES = [
   'Digit1',
@@ -21,6 +21,15 @@ const NUDGE_KEYS: Record<string, [number, number, number]> = {
   ArrowRight: [1, 0, 0],
   PageUp: [0, 1, 0],
   PageDown: [0, -1, 0]
+};
+
+const TOOL_KEYS: Record<string, ToolMode> = {
+  KeyQ: 'select',
+  KeyG: 'move',
+  KeyR: 'rotate',
+  KeyS: 'scale',
+  KeyE: 'extrude',
+  KeyP: 'paint'
 };
 
 /**
@@ -53,22 +62,33 @@ export default function GlobalHotkeys() {
         return;
       }
 
+      const inspectorOpen = useAppStore.getState().inspectorOpen;
+      if (!inspectorOpen) return;
+
       if (e.code === 'KeyG' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        const selection = useAppStore.getState().selection;
-        if (selection.length > 0) {
-          useWorldStore.getState().groupSelection(selection);
-        }
+        const selection = useSceneStore.getState().selection;
+        if (selection.length > 0) useSceneStore.getState().groupSelection(selection);
         return;
       }
 
-      if (useAppStore.getState().inspectorOpen && e.code in NUDGE_KEYS) {
+      if (e.code in TOOL_KEYS && !e.ctrlKey && !e.metaKey) {
+        useAppStore.getState().setToolMode(TOOL_KEYS[e.code]!);
+        return;
+      }
+
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        const selection = useSceneStore.getState().selection;
+        for (const id of selection) useSceneStore.getState().deleteObject(id);
+        return;
+      }
+
+      if (e.code in NUDGE_KEYS) {
         e.preventDefault();
-        const selection = useAppStore.getState().selection;
+        const selection = useSceneStore.getState().selection;
         if (selection.length === 0) return;
-        const [dx, dy, dz] = NUDGE_KEYS[e.code]!;
-        const newKeys = useWorldStore.getState().nudgeBlocks(selection, dx, dy, dz);
-        useAppStore.getState().setSelection(newKeys);
+        const delta = NUDGE_KEYS[e.code]!;
+        useSceneStore.getState().nudgeSelection(selection, delta);
       }
     };
 
